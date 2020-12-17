@@ -1,6 +1,7 @@
 #include <common/standard.h>
 #include <boolean/number.h>
 #include <interpret_boolean/export.h>
+#include <synthesize/boolean.h>
 
 using namespace boolean;
 
@@ -35,137 +36,28 @@ void print(unsigned_int n, ucs::variable_set vars)
 	cout << endl;
 }
 
-
-unsigned_int decompose_hfactor(unsigned_int c, int w, map<cube, int> &factors, ucs::variable_set &vars, vector<int> hide)
+void print_help()
 {
-	fflush(stdout);
-	if (c.max_width() >= w and c.depth() > 1) {
-		boolean::cube common = c.supercube();
-		common.hide(hide);
-		if (common.width() < w)
-		{
-			boolean::unsigned_int c_left, c_right;
-			boolean::unsigned_int left_result, right_result;
-			unsigned long cubes = 0;
-			for (int i = 0; i < (int)c.bits.size(); i++) {
-				cubes += c.bits[i].cubes.size();
-			}
-			float c_weight = c.partition(c_left, c_right);
-
-			left_result = decompose_hfactor(c_left, w, factors, vars, hide);
-			right_result = decompose_hfactor(c_right, w, factors, vars, hide);
-			return left_result | right_result;
-		}
-		else
-		{
-			c.cofactor(common);
-			int index = -1;
-			map<cube, int>::iterator loc = factors.find(common);
-			if (loc == factors.end()) {
-				index = vars.define(ucs::variable());
-				vars.nodes[index].name.push_back(ucs::instance("f", {(int)factors.size()}));
-				factors.insert(pair<cube, int>(common, index));
-			} else {
-				index = loc->second;
-			}
-
-			unsigned_int result = decompose_hfactor(c, w, factors, vars, hide);
-			for (int i = 0; i < (int)result.bits.size(); i++) {
-				result.bits[i] &= boolean::cube(index, 1);
-			}
-			return result;
-		}
-	}
-
-	return c;
+	printf("Usage: gated [options] file...\n");
+	printf("A logic minimization engine.\n");
+	printf("\nGeneral Options:\n");
+	printf(" -h,--help      Display this information\n");
+	printf("    --version   Display version information\n");
+	printf(" -v,--verbose   Display verbose messages\n");
+	printf(" -d,--debug     Display internal debugging messages\n");
+	printf("\nConversion Options:\n");
+	printf(" -g <file>      Convert this HSE to an hse-graph and save it to a file\n");
+	printf(" -eg <file>     Convert this HSE to an elaborated hse-graph and save it to a file\n");
+	printf(" -pn <file>     Convert this HSE to a petri-net and save it to a file\n");
+	printf(" -sg <file>     Convert this HSE to a state-graph and save it to a file\n");
 }
 
-unsigned_int decompose_xfactor(unsigned_int c, int w, map<cube, int> &factors, ucs::variable_set &vars, vector<int> hide)
+void print_version()
 {
-	if (c.max_width() >= w and c.depth() > 1) {
-		unsigned_int nc = ~c;
-		boolean::cube common = c.supercube();
-		boolean::cube ncommon = nc.supercube();
-		common.hide(hide);
-		ncommon.hide(hide);
-		int cw = common.width(), ncw = ncommon.width();
-
-		if (cw < w and ncw < w) {
-			unsigned_int c_left, c_right, nc_left, nc_right;
-			unsigned_int result, left_result, right_result;
-			float c_weight, nc_weight;
-			
-			unsigned long cubes = 0;
-			for (int i = 0; i < (int)c.bits.size(); i++) {
-				cubes += c.bits[i].cubes.size();
-			}
-
-			c_weight = c.partition(c_left, c_right);
-
-			cubes = 0;
-			for (int i = 0; i < (int)nc.bits.size(); i++) {
-				cubes += nc.bits[i].cubes.size();
-			}
-
-			nc_weight = nc.partition(nc_left, nc_right);
-
-			if (c_weight <= nc_weight)
-			{
-				left_result = decompose_xfactor(c_left, w, factors, vars, hide);
-				right_result = decompose_xfactor(c_right, w, factors, vars, hide);
-				result = left_result | right_result;
-			}
-			else if (nc_weight < c_weight)
-			{
-				left_result = decompose_xfactor(nc_left, w, factors, vars, hide);
-				right_result = decompose_xfactor(nc_right, w, factors, vars, hide);
-				result = left_result | right_result;
-				//printf("here\n");
-				// We're getting stuck here...
-				result = ~result;
-				//printf("done\n");
-			}
-			return result;
-		} else if (cw >= ncw) {
-			c.cofactor(common);
-
-			map<cube, int>::iterator loc = factors.find(common);
-			int index = -1;
-			if (loc == factors.end()) {
-				index = vars.define(ucs::variable());
-				vars.nodes[index].name.push_back(ucs::instance("f", {(int)factors.size()}));
-				factors.insert(pair<cube, int>(common, index));
-			} else {
-				index = loc->second;
-			}
-		
-			unsigned_int result = decompose_xfactor(c, w, factors, vars, hide);
-			for (int i = 0; i < (int)result.bits.size(); i++) {
-				result.bits[i] &= boolean::cube(index, 1);
-			}
-			return result;
-		} else if (ncw > cw) {
-			nc.cofactor(ncommon);
-
-			map<cube, int>::iterator loc = factors.find(ncommon);
-			int index = -1;
-			if (loc == factors.end()) {
-				index = vars.define(ucs::variable());
-				vars.nodes[index].name.push_back(ucs::instance("f", {(int)factors.size()}));
-				factors.insert(pair<cube, int>(ncommon, index));
-			} else {
-				index = loc->second;
-			}
-			
-			unsigned_int result = decompose_xfactor(nc, w, factors, vars, hide);
-			for (int i = 0; i < (int)result.bits.size(); i++) {
-				result.bits[i] &= boolean::cube(index, 1);
-			}
-			return ~result;
-		}
-	}
-
-	return c;
+	printf("hsesim 1.0.0\n");
+	printf("Copyright (C) 2013 Sol Union.\n");
+	printf("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
+	printf("\n");
 }
 
 
