@@ -1,40 +1,40 @@
 #include <fstream>
 #include <iostream>
 #include <common/standard.h>
-#include <boolean/number.h>
+#include <boolean/unsigned_int.h>
+#include <boolean/signed_int.h>
 #include <interpret_boolean/export.h>
 #include <interpret_boolean/import.h>
-#include <synthesize/boolean.h>
 #include <parse_expression/expression.h>
 
 using namespace boolean;
 
-void print_xfactor(string name, int index, unsigned_int n, ucs::variable_set vars)
+void print_xfactor(string name, unsigned_int n, ucs::variable_set vars)
 {
 	for (int i = 0; i < n.bits.size(); i++)
 	{
 		parse_expression::expression result = export_expression_xfactor(n.bits[i], vars);
-		cout << name << index << "[" << i << "]:\t" << result.to_string() << endl;
+		cout << name << "[" << i << "]:\t" << result.to_string() << endl;
 	}
 	cout << endl;
 }
 
-void print_hfactor(string name, int index, unsigned_int n, ucs::variable_set vars)
+void print_hfactor(string name, unsigned_int n, ucs::variable_set vars)
 {
 	for (int i = 0; i < n.bits.size(); i++)
 	{
 		parse_expression::expression result = export_expression_hfactor(n.bits[i], vars);
-		cout << name << index << "[" << i << "]:\t" << result.to_string() << endl;
+		cout << name << "[" << i << "]:\t" << result.to_string() << endl;
 	}
 	cout << endl;
 }
 
-void print(string name, int index, unsigned_int n, ucs::variable_set vars)
+void print(string name, unsigned_int n, ucs::variable_set vars)
 {
 	for (int i = 0; i < n.bits.size(); i++)
 	{
 		parse_expression::expression result = export_expression(n.bits[i], vars);
-		cout << name << index << "[" << i << "]:\t" << result.to_string() << endl;
+		cout << name << "[" << i << "]:\t" << result.to_string() << endl;
 	}
 	cout << endl;
 }
@@ -48,13 +48,13 @@ void print_help()
 	printf("    --version   Display version information\n");
 	printf("\nConversion Options:\n");
 	printf(" -i <inputs>      Comma separated list of variable definitions <name>:<type>. Type is 'u' for unsigned int, 'i' for signed int, or 'f' for float followed by the bitwidth. For example: \"a:u8,b:i4,x:u5\"\n");
-	printf(" -o <outputs>     Comma separated list of expressions. For example: \"a+b,b<<x\"\n");
+	printf(" -o <outputs>     Comma separated list of expressions. For example: \"r0=a+b,r1=b<<x\"\n");
 }
 
 void print_version()
 {
 	printf("gated 1.0.0\n");
-	printf("Copyright (C) 2020 Ned Bingham.\n");
+	printf("Copyright (C) 2020 Cornell University.\n");
 	printf("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 	printf("\n");
 }
@@ -160,18 +160,21 @@ int main(int argc, char **argv)
 		start = end+1;
 	} while (start > 0);
 
-	list<boolean::unsigned_int> result;
+	map<string, boolean::bitset> result;
 
 	start = 0;
 	end = 0;
 	while (end != string::npos) {
+		end = output.find("=", start);
+		string name = output.substr(start, end - start);
+		start = end+1;
 		end = output.find(",", start);
 		string exp_str = output.substr(start, end - start);
 		start = end+1;
 		parser.insert("", exp_str);
 		parse_expression::expression exp(parser);
 		if (parser.is_clean()) {
-			result.push_back(import_unsigned_int(exp, u, 0, &parser));
+			result.insert(pair<string, boolean::bitset>(name, import_unsigned_int(exp, u, 0, &parser)));
 		}
 		parser.reset();
 	}
@@ -185,31 +188,42 @@ int main(int argc, char **argv)
 		((b == 6) & ((a<<3) + (~a<<1) + y)) |
 		((b == 7) & ((a<<3) + (~a) + y)) | 
 		((b == 8) & ((a<<3) + y));
-	p.simplify();*/
+	p.espresso();*/
+
+	bitset total;
 	
-	int index = 0;
-	for (list<boolean::unsigned_int>::iterator i = result.begin(); i != result.end(); i++) {
-		i->simplify();
-		print_xfactor("r", index, *i, vars);
-		printf("\n\n");
-		index++;
+	for (map<string, boolean::bitset>::iterator i = result.begin(); i != result.end(); i++) {
+		i->second.espresso();
+		total.append(i->second);
+		print_xfactor(i->first, i->second, vars);
 	}
-	
-	/*vector<int> hide;// = {0, 1, 2, 3, 8, 9, 10, 11, 12};
+
 	map<cube, int> factors;
+	vector<int> hide;// = {0, 1, 2, 3, 8, 9, 10, 11, 12};
+
 	int sz = 0;
-	
 	do {
 		sz = (int)factors.size();
-		p = decompose_xfactor(p, 2, factors, vars, hide);
+		total = total.decompose_hfactor(factors, 2, vars.nodes.size(), hide);
 	} while (factors.size() > sz);
+
+	for (int j = 0; j < (int)factors.size(); j++)
+	{
+		int index = vars.define(ucs::variable());
+		vars.nodes[index].name.push_back(ucs::instance("f", {j}));
+	}
 	
 	for (map<cube, int>::iterator i = factors.begin(); i != factors.end(); i++)
 	{
 		parse_expression::expression result = export_expression(i->first, vars);
-		cout << vars.nodes[i->second].to_string() << ":\t" << result.to_string() << endl << endl;
+		cout << vars.nodes[i->second].to_string() << ":\t" << result.to_string() << endl;
 	}
+	cout << endl;
 
-	print_xfactor(p, vars);*/
+	int index = 0;
+	for (map<string, boolean::bitset>::iterator i = result.begin(); i != result.end(); i++) {
+		print_xfactor(i->first, total.subset(index, i->second.bits.size()), vars);
+		index += i->second.bits.size();
+	}
 }
 
