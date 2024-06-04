@@ -1,3 +1,7 @@
+*.o
+*.a
+*.so
+*.d
 gated
-build/*
-
+test
+build
